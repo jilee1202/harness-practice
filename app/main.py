@@ -4,12 +4,16 @@
 확인:  브라우저에서 http://127.0.0.1:8000/docs
 """
 
+from pathlib import Path
+
 from fastapi import FastAPI
-from fastapi.responses import RedirectResponse
+from fastapi.responses import HTMLResponse
 
 from .coupons import COUPONS
 from .models import OrderRequest, PriceBreakdown
 from .pricing import calculate_price
+
+TEMPLATE_DIR = Path(__file__).parent / "templates"
 
 app = FastAPI(
     title="주문 요금 계산 API",
@@ -18,10 +22,10 @@ app = FastAPI(
 )
 
 
-@app.get("/", include_in_schema=False)
+@app.get("/", response_class=HTMLResponse, include_in_schema=False)
 def root():
-    """루트로 들어오면 문서 화면으로 보낸다."""
-    return RedirectResponse(url="/docs")
+    """사람이 쓰는 계산기 화면. 개발자용 화면은 /docs 에 있다."""
+    return (TEMPLATE_DIR / "index.html").read_text(encoding="utf-8")
 
 
 @app.get("/health", summary="서버가 살아 있는지 확인")

@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>주문 요금 계산기</title>
+<style>
+  :root{
+    --bg:#f6f5f3; --card:#fff; --ink:#1f1d1a; --muted:#6b665f;
+    --line:#e3dfd9; --accent:#b45309; --accent-ink:#fff;
+    --ok:#047857; --ok-bg:#ecfdf5;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; padding:32px 16px 64px; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Malgun Gothic","Noto Sans KR",sans-serif;
+    line-height:1.6;
+  }
+  .wrap{max-width:760px;margin:0 auto}
+  h1{font-size:22px;margin:0 0 4px}
+  .sub{color:var(--muted);font-size:13.5px;margin:0 0 24px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:22px;margin-bottom:18px}
+  .card h2{font-size:14px;margin:0 0 16px;letter-spacing:.04em;color:var(--accent);text-transform:uppercase}
+  label{display:block;font-size:13px;color:var(--muted);margin-bottom:5px}
+  input,select{
+    width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:7px;
+    font-size:15px;font-family:inherit;background:#fff;color:var(--ink);
+  }
+  input:focus,select:focus{outline:2px solid var(--accent);outline-offset:-1px}
+  .row{display:grid;grid-template-columns:2fr 1.2fr 1fr auto;gap:10px;align-items:end;margin-bottom:10px}
+  .row button.del{
+    background:none;border:1px solid var(--line);border-radius:7px;color:var(--muted);
+    height:38px;width:38px;font-size:17px;cursor:pointer
+  }
+  .row button.del:hover{border-color:#c33;color:#c33}
+  .opts{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:4px}
+  @media(max-width:560px){.row{grid-template-columns:1fr 1fr;}.opts{grid-template-columns:1fr}}
+  .check{display:flex;align-items:center;gap:8px;margin-top:10px}
+  .check input{width:auto}
+  .check label{margin:0;font-size:14px;color:var(--ink)}
+  .btns{display:flex;gap:10px;margin-top:6px}
+  button.primary{
+    background:var(--accent);color:var(--accent-ink);border:none;border-radius:8px;
+    padding:12px 26px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit
+  }
+  button.primary:hover{filter:brightness(1.08)}
+  button.ghost{
+    background:none;border:1px solid var(--line);border-radius:8px;padding:12px 18px;
+    font-size:14px;cursor:pointer;color:var(--muted);font-family:inherit
+  }
+  table{width:100%;border-collapse:collapse;font-size:15px}
+  td{padding:9px 0;border-bottom:1px solid var(--line)}
+  td.r{text-align:right;font-variant-numeric:tabular-nums}
+  tr.total td{border-bottom:none;border-top:2px solid var(--ink);font-size:19px;font-weight:700;padding-top:14px}
+  tr.minus td.r{color:var(--accent)}
+  .notes{margin-top:16px;padding:14px 16px;background:var(--ok-bg);border-radius:8px;font-size:13.5px;color:var(--ok)}
+  .notes ul{margin:0;padding-left:18px}
+  .notes li{margin-bottom:3px}
+  .hide{display:none}
+  .err{color:#b91c1c;font-size:14px;margin-top:10px}
+  .hint{font-size:12.5px;color:var(--muted);margin-top:14px}
+  .hint a{color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>주문 요금 계산기</h1>
+  <p class="sub">값을 넣고 계산 버튼을 누르면, 어디서 얼마가 깎였는지 단계별로 보여줍니다.</p>
+
+  <div class="card">
+    <h2>주문 항목</h2>
+    <div id="items"></div>
+    <button class="ghost" type="button" onclick="addRow()">+ 항목 추가</button>
+  </div>
+
+  <div class="card">
+    <h2>할인 조건</h2>
+    <div class="opts">
+      <div>
+        <label for="grade">회원 등급</label>
+        <select id="grade">
+          <option value="일반">일반 (할인 없음)</option>
+          <option value="실버">실버 (3%)</option>
+          <option value="골드" selected>골드 (5%)</option>
+          <option value="VIP">VIP (10%)</option>
+        </select>
+      </div>
+      <div>
+        <label for="coupon">쿠폰</label>
+        <select id="coupon">
+          <option value="">쿠폰 없음</option>
+          <option value="WELCOME5000" selected>WELCOME5000 — 5,000원 할인</option>
+          <option value="SPRING10">SPRING10 — 10% 할인</option>
+          <option value="BIGSALE">BIGSALE — 50,000원 할인</option>
+        </select>
+      </div>
+    </div>
+    <div class="check">
+      <input type="checkbox" id="weekend">
+      <label for="weekend">주말 주문 (지금은 계산에 반영되지 않습니다)</label>
+    </div>
+  </div>
+
+  <div class="btns">
+    <button class="primary" type="button" onclick="calc()">계산하기</button>
+  </div>
+
+  <div class="card hide" id="result" style="margin-top:18px">
+    <h2>계산 결과</h2>
+    <table id="table"></table>
+    <div class="notes" id="notes"></div>
+  </div>
+
+  <div class="err hide" id="error"></div>
+
+  <p class="hint">
+    업무 규칙은 <code>docs/pricing-rules.md</code> 에 한국어로 적혀 있습니다.
+    개발자용 화면은 <a href="/docs">/docs</a> 입니다.
+  </p>
+
+</div>
+
+<script>
+const won = n => n.toLocaleString('ko-KR') + '원';
+
+function addRow(name='텀블러', price=12000, qty=3){
+  const div = document.createElement('div');
+  div.className = 'row';
+  div.innerHTML = `
+    <div><label>상품명</label><input class="i-name" value="${name}"></div>
+    <div><label>단가(원)</label><input class="i-price" type="number" min="0" value="${price}"></div>
+    <div><label>수량</label><input class="i-qty" type="number" min="1" value="${qty}"></div>
+    <button class="del" type="button" title="삭제">×</button>`;
+  div.querySelector('.del').onclick = () => {
+    if (document.querySelectorAll('#items .row').length > 1) div.remove();
+  };
+  document.getElementById('items').appendChild(div);
+}
+addRow();
+
+async function calc(){
+  const rows = [...document.querySelectorAll('#items .row')];
+  const items = rows.map(r => ({
+    name: r.querySelector('.i-name').value || '상품',
+    unit_price: parseInt(r.querySelector('.i-price').value || '0', 10),
+    quantity: parseInt(r.querySelector('.i-qty').value || '1', 10)
+  }));
+  const payload = {
+    items,
+    grade: document.getElementById('grade').value,
+    coupon_code: document.getElementById('coupon').value || null,
+    is_weekend: document.getElementById('weekend').checked
+  };
+
+  const errBox = document.getElementById('error');
+  errBox.className = 'err hide';
+
+  try {
+    const res = await fetch('/price', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) throw new Error('서버 응답 오류 (' + res.status + ')');
+    render(await res.json());
+  } catch (e) {
+    errBox.textContent = '계산에 실패했습니다: ' + e.message;
+    errBox.className = 'err';
+  }
+}
+
+function render(d){
+  const t = document.getElementById('table');
+  const row = (label, value, cls='') =>
+    `<tr class="${cls}"><td>${label}</td><td class="r">${value}</td></tr>`;
+
+  let html = row('① 상품 합계', won(d.subtotal));
+  html += row('② 등급 할인', d.grade_discount ? '-' + won(d.grade_discount) : '없음',
+              d.grade_discount ? 'minus' : '');
+  html += row('③ 쿠폰 할인' + (d.coupon_code ? ` (${d.coupon_code})` : ''),
+              d.coupon_discount ? '-' + won(d.coupon_discount) : '없음',
+              d.coupon_discount ? 'minus' : '');
+  html += row('④ 배송비', d.shipping_fee ? won(d.shipping_fee) : '무료');
+  html += row('⑤ 최종 결제 금액', won(d.total), 'total');
+  t.innerHTML = html;
+
+  document.getElementById('notes').innerHTML =
+    '<ul>' + d.notes.map(n => `<li>${n}</li>`).join('') + '</ul>';
+  document.getElementById('result').className = 'card';
+}
+</script>
+</body>
+</html>
