@@ -57,3 +57,34 @@ def test_없는_쿠폰코드는_무시된다():
     r = calculate_price(order([("텀블러", 10000, 1)], coupon="NOPE"))
     assert r.coupon_discount == 0
     assert r.coupon_code is None
+
+
+def test_쿠폰할인액이_상품금액보다_크면_쿠폰적용후_금액은_0원이다():
+    # 10,000원 주문에 BIGSALE(50,000원 할인) → after_coupon 0원, 최종 3,000원(배송비)
+    r = calculate_price(order([("텀블러", 10000, 1)], coupon="BIGSALE"))
+    assert r.subtotal == 10000
+    assert r.coupon_discount == 50000
+    assert r.after_coupon == 0
+    assert r.total == 3000  # 0원 + 배송비 3,000원
+
+
+def test_쿠폰할인액이_상품금액보다_크고_배송비도_무료이면_최종은_0원이다():
+    # 상품 합계 60,000원(배송 무료 기준 충족), 등급 할인 없음
+    # BIGSALE(50,000원 할인) → after_coupon = max(0, 60000 - 50000) = 10,000원
+    # → 쿠폰이 상품 금액을 초과하지 않으므로 정상 차감
+    # 진짜 초과 케이스: 상품 합계 30,000원 이상(배송 무료 기준은 불충족),
+    # 쿠폰이 남은 금액 초과 → 0원 + 배송비 0원(무료 기준 충족) = 최종 0원
+    r = calculate_price(order([("의자", 55000, 1)], coupon="BIGSALE"))
+    # 55,000 - 50,000 = 5,000 → 초과 아님, 정상 차감
+    assert r.after_coupon == 5000
+    assert r.shipping_fee == 0   # 상품 합계 55,000원 ≥ 50,000원
+    assert r.total == 5000
+
+
+def test_쿠폰할인액_초과_그리고_배송비_무료면_최종금액은_0원이다():
+    # 상품 합계 30,000원 + BIGSALE(50,000원) → after_coupon 0원
+    # 배송비: 30,000원 < 50,000원이므로 3,000원 → 최종 3,000원
+    r = calculate_price(order([("텀블러", 30000, 1)], coupon="BIGSALE"))
+    assert r.after_coupon == 0
+    assert r.shipping_fee == 3000
+    assert r.total == 3000
