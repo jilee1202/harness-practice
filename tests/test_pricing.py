@@ -57,3 +57,20 @@ def test_없는_쿠폰코드는_무시된다():
     r = calculate_price(order([("텀블러", 10000, 1)], coupon="NOPE"))
     assert r.coupon_discount == 0
     assert r.coupon_code is None
+
+
+def test_쿠폰할인액이_상품금액보다_크면_쿠폰적용후_금액은_0원이다():
+    # 10,000원 주문에 BIGSALE(50,000원 할인) → after_coupon 0원, 최종 3,000원(배송비)
+    r = calculate_price(order([("텀블러", 10000, 1)], coupon="BIGSALE"))
+    assert r.subtotal == 10000
+    assert r.coupon_discount == 50000
+    assert r.after_coupon == 0
+    assert r.total == 3000  # 0원 + 배송비 3,000원
+
+
+def test_쿠폰할인액이_상품금액보다_크면_최종금액은_음수가_되지_않는다():
+    # 5만원 이상이라 배송비 무료 → 최종 0원
+    r = calculate_price(order([("의자", 60000, 1)], coupon="BIGSALE"))
+    assert r.after_coupon == 0
+    assert r.shipping_fee == 0
+    assert r.total == 0
