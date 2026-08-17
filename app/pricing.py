@@ -38,6 +38,7 @@ def calculate_price(order: OrderRequest) -> PriceBreakdown:
         notes.append(f"{order.grade.value} 등급은 할인 없음")
 
     # ③ 쿠폰 할인 — 등급 할인이 적용된 금액에서 다시 뺀다
+    #    할인액이 남은 금액보다 크면 0원에서 멈춘다 (음수 방지)
     coupon = find_coupon(order.coupon_code)
     coupon_discount = 0
     if coupon is None:
@@ -52,7 +53,9 @@ def calculate_price(order: OrderRequest) -> PriceBreakdown:
         coupon_discount = round(after_grade * coupon.value)
         notes.append(f"쿠폰 {coupon.label} -{coupon_discount:,}원")
 
-    after_coupon = after_grade - coupon_discount
+    after_coupon = max(0, after_grade - coupon_discount)
+    if after_grade - coupon_discount < 0:
+        notes.append("쿠폰 할인액이 상품 금액을 초과하여 0원으로 고정")
 
     # ④ 배송비 — 무료 기준은 '할인 전' 상품 합계로 판단한다
     if subtotal >= FREE_SHIPPING_THRESHOLD:
